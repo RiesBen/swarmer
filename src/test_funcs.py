@@ -3,18 +3,19 @@ import time
 
 execute_it=True
 
-swarm = api.Swarm(swarm_id="Swarmer", server_id="http://10.4.14.37:5000/api")
+swarm = api.Swarm(swarm_id="Swarmer", server_id="http://10.4.14.28:5000/api")
+#248, 28, 37
 
 arena = swarm.get_arena()
-print("ARENA:\n",arena)
+#print("ARENA:\n",arena)
 
-print(swarm.buildings )
+#print(swarm.buildings )
 buildingOne = swarm.buildings[0]
 buildingOne = arena["buildings"][0]
-print("BUILDING: ",buildingOne)
+#print("BUILDING: ",buildingOne)
 
 drone_ids = swarm.droneIDs
-print(drone_ids)
+#print(drone_ids)
 
 droneOne = api.Drone(droneID=drone_ids[1], swarm=swarm)
 
@@ -23,7 +24,6 @@ try:
     registered= swarm.register()
 except Exception as err:
     print("Was already Registered")
-print(registered)
 
 #generate packages
 #packages = [swarm.get_package() for x in range(10)]
@@ -34,12 +34,14 @@ if execute_it:
         register_drone = droneOne.connect()
         droneOne.takeoff(height=0.3, vel=1)
 
-        droneOne.goto(pos=(1.0, 1.6))
+        droneOne.goto(pos=(0.1, 0.16))
         droneOne.do_delivery()
-        droneOne.goto(pos=(2.2,1.6,0.0))
+        #droneOne.goto(pos=(2.2,1.6,0.0))
 
         droneOne.land(height=0, vel=1)
         droneOne.disconnect()
+
     except Exception as err:
+        droneOne.land()
         droneOne.disconnect()
         print("error: "+str(err.args))

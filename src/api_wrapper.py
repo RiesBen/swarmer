@@ -126,7 +126,7 @@ class Drone(Api):
     capacity:float = None
     action:Action = None
     status:str = None
-    sleep_update: int = 5
+    sleep_update: int = 2
     accepted_variance = 0.1
     def __init__(self, droneID:int, swarm:Swarm, capacity:float=1.0):
         super().__init__(server_id=swarm.server_id)
@@ -135,7 +135,6 @@ class Drone(Api):
         self.capacity = capacity
 
     def _reached_target(self):
-        print(vars(self.action))
         targets = {x:getattr(self.action, x)  for x in vars(self.action) if "target" in x}
         actual_pos = {"x":self.x, "y":self.y, "z":self.z}
         var_pos = [self.var_x, self.var_y, self.var_z]
@@ -149,12 +148,14 @@ class Drone(Api):
                 continue
             else:
                 return False
+        print("Reached Targets")
         return True
 
     def _wait_for_task(self):
         self._update_status()
         if(self.action == None):
             return True
+
         while True:
             if(not self._reached_target()):
                 if(self.action.waited_dur):
@@ -162,7 +163,6 @@ class Drone(Api):
                 else:
                     sleep_time = 0.95*self.action.duration
                     setattr(self.action, "waited_dur", True)
-
                 print("Waiting for " + str(sleep_time) + "s with status: " + self.status)
                 time.sleep(sleep_time)
                 self._update_status()
@@ -171,8 +171,7 @@ class Drone(Api):
             elif any([self.status == x for x in  ["OFFLINE"]]):
                 raise Exception("DRONE - ACTION FAILED drone is : "+self.status)
             else:
-                self._update_status()
-                time.sleep(1)
+                print("next")
                 break
 
 
@@ -207,7 +206,6 @@ class Drone(Api):
         command="takeoff?z="+str(height)+"&v="+str(vel)
         register = self._drone_command(command)
         setattr(self, "action", Action(register))
-        self._update_status()
         return register
 
     def land(self, height:float=0, vel:float=1)->dict:
@@ -219,13 +217,14 @@ class Drone(Api):
         return register
 
     def goto(self, pos:(int,int,int)=(0,0,0), vel:float=1, yaw:float = 0.0)->float:
+        print("Goto waiting")
         self._wait_for_task()
 
         #check bugs
         if(self.z == 0):
             raise Exception("I'm not in the air!")
 
-        command="goto?x="+str(pos.x)+"&y="+str(pos.y)+"&z="+str(pos.z)+"&yaw="+str(yaw)+"&v="+str(vel)
+        command="goto?x="+str(pos[0])+"&y="+str(pos[1])+"&z="+str(pos[2])+"&yaw="+str(yaw)+"&v="+str(vel)
         action_dict = self._drone_command(command)
         print("Drone "+self.ID+" is navigating to: "+str(pos))
         action = Action(action_dict)
