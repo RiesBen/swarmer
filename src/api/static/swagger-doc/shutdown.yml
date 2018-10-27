@@ -1,0 +1,7 @@
+Disconnect all drones and shutsdown the whole server.
+---
+responses:
+  200:
+    description: Server shutting down...
+    schema:
+      type: string

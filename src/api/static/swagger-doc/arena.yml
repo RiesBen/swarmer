@@ -1,0 +1,8 @@
+Gets the dimensions of the arena.
+---
+responses:
+  200:
+    description: The dimensions of the arena.
+    schema:
+      $ref: /static/swagger-doc/definitions/arena_stats.yml
+      

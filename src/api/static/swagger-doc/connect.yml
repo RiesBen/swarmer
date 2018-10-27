@@ -1,0 +1,38 @@
+Connects a drone to a swarm.
+---
+parameters:
+  - name: swarm_id
+    in: path
+    type: string
+    description: Id of the swarm.
+  - name: drone_id
+    in: path
+    type: string
+    description: Id of the drone.
+  - name: r
+    in: query
+    type: number
+    format: integer
+    description: Id of the crazyradio.
+  - name: c
+    in: query
+    type: number
+    format: integer
+    description: Number of the channel.
+  - name: a
+    in: query
+    type: string
+    description: Address of the drone.
+    example: E7E7E7E7
+  - name: dr
+    in: query
+    type: string
+    description: Data rate of the drone.
+    example: 2M
+responses:
+  500:
+    description: Error when connection attempt failed.
+  200:
+    description: Stats of the connected drone.
+    schema:
+      $ref: /static/swagger-doc/definitions/drone_stats.yml
