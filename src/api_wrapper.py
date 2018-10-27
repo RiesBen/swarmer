@@ -4,15 +4,14 @@ import enum
 import time
 
 class Package:
-    coordinates: (int, int, int)=None
+    coordinates: (float, float, float)=None
     weight: float = None
     id :str = None
 
-    def __init__(self, coordinates:(int, int, int), weight:float, id:str):
+    def __init__(self, coordinates:(float, float, float), weight:float, id:str):
         self.coordinates = coordinates
         self.weight = weight
         self.id = id
-
 
 class Action:
     duration: float = None
@@ -86,12 +85,14 @@ class Swarm(Api):
     swarm_adress:str = None
     droneIDs:list = []
     packages: list = []
+    drone_jobs:dict = {}
 
     def __init__(self, swarm_id:str, server_id:str = "http://10.4.14.248:5000/api", swarm_drones=[34,35,36]):
         super().__init__(server_id=server_id)
         self.id = swarm_id
         self.swarm_adress = server_id+"/"+self.id
         self.droneIDs = swarm_drones
+        self.drone_jobs = {x:[] for x in self.droneIDs}
 
     def _swarm_command(self, command:str)->dict  or bool:
         return self._command(adress=self.swarm_adress, command=command)
@@ -128,6 +129,7 @@ class Drone(Api):
     status:str = None
     sleep_update: int = 2
     accepted_variance = 0.1
+
     def __init__(self, droneID:int, swarm:Swarm, capacity:float=1.0):
         super().__init__(server_id=swarm.server_id)
         self.swarm_adress = swarm.swarm_adress
@@ -191,6 +193,23 @@ class Drone(Api):
     def _drone_command(self, command:str)->dict or bool:
         return self._command(adress=self.swarm_adress+"/"+str(self.ID), command=command)
 
+    #funcs
+    def assign_job(self, delivery_path:list):
+        for x in delivery_path:
+            self.goto(float(x[0]), float(x[1]), float(x[2]))
+
+        self.do_delivery()
+
+        for x in reversed(delivery_path):
+            self.goto(float(x[0]), float(x[1]), float(x[2]))
+
+    def do_delivery(self):
+        self.land()
+        self.deliver()
+        self.takeoff()
+
+
+    #API
     def connect(self, radio:int=0):
         command="connect?r="+str(radio)+"&c=98&a=E7E7E7E7"+str(self.ID)+"&dr=2M"
         self._drone_command(command=command)
@@ -216,7 +235,7 @@ class Drone(Api):
         print("Drone: "+str(self.ID)+"\t Landing")
         return register
 
-    def goto(self, pos:(int,int,int)=(0,0,0), vel:float=1, yaw:float = 0.0)->float:
+    def goto(self, pos:(float,float,float)=(1,1,0), vel:float=0.5, yaw:float = 0.0)->float:
         print("Goto waiting")
         self._wait_for_task()
 
@@ -224,7 +243,7 @@ class Drone(Api):
         if(self.z == 0):
             raise Exception("I'm not in the air!")
 
-        command="goto?x="+str(pos[0])+"&y="+str(pos[1])+"&z="+str(pos[2])+"&yaw="+str(yaw)+"&v="+str(vel)
+        command="goto?x="+str(float(pos[0]))+"&y="+str(float(pos[1]))+"&z="+str(float(pos[2]))+"&yaw="+str(yaw)+"&v="+str(vel)
         action_dict = self._drone_command(command)
         print("Drone "+self.ID+" is navigating to: "+str(pos))
         action = Action(action_dict)
@@ -245,14 +264,11 @@ class Drone(Api):
         self._wait_for_task()
         command="deliver?package_id="+str(packageID)
         register = self._drone_command(command=command)
+        action = Action(register)
+        setattr(self.action, action)
         return register
 
     def calibrate(self)->bool:
         command="calibrate"
         register = self._drone_command(command)
         return register["success"]
-
-    def do_delivery(self):
-        self.land()
-        self.deliver()
-        self.takeoff()

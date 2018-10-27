@@ -34,7 +34,7 @@ if execute_it:
         register_drone = droneOne.connect()
         droneOne.takeoff(height=0.3, vel=1)
 
-        droneOne.goto(pos=(0.1, 0.16))
+        droneOne.goto(pos=(1.0, 1.6), vel=0.2)
         droneOne.do_delivery()
         #droneOne.goto(pos=(2.2,1.6,0.0))
 
