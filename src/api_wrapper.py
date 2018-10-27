@@ -1,6 +1,5 @@
 import json
 import requests
-import src.coordinates.coord as coord
 
 class Package:
     coordinates: (int, int, int)=None

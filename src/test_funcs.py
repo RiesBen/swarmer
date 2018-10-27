@@ -14,7 +14,9 @@ buildingOne = arena["buildings"][0]
 print("BUILDING: ",buildingOne)
 
 
-packages = [swarm.get_package() for x in range(200)]
+packages = [swarm.get_package() for x in range(10)]
+
+print([x.weight for x in packages])
 
 drone_ids = swarm.droneIDs
 print(drone_ids)
