@@ -2,6 +2,7 @@ import json
 import requests
 import time
 
+
 class Package:
     coordinates: (float, float, float)=None
     weight: float = None
@@ -96,6 +97,9 @@ class Swarm(Api):
             self.drones.append(tmp_drone)
             tmp_drone.connect()
 
+    def shutdwon(self):
+        for drone in self.drones:
+            drone.disconnect()
     def schedule_jobs(self):
         for droneID in self.droneIDs:
             if(self.drone_jobs[droneID] == "FREE"):
@@ -131,18 +135,21 @@ class Swarm(Api):
 
 class Drone(Api):
     ID:int = None
+    swarm: Swarm = None
     swarm_adress:str = None
     capacity:float = None
     action:Action = None
     status:str = None
-    sleep_update: int = 2
-    accepted_variance = 0.1
+    sleep_update: float = 1
+    accepting_ration:float = 0.75
+    accepted_variance = 0.2
     packages:Package = []
     load = 0
     flight_heigth = 0.3
 
     def __init__(self, droneID:int, swarm:Swarm, capacity:float=1.0):
         super().__init__(server_id=swarm.server_id)
+        self.swarm = swarm
         self.swarm_adress = swarm.swarm_adress
         self.ID = droneID
         self.capacity = capacity
@@ -179,7 +186,7 @@ class Drone(Api):
                 if(self.action.waited_dur):
                     sleep_time = self.sleep_update
                 else:
-                    sleep_time = 0.95*self.action.duration
+                    sleep_time = self.accepting_ration*self.action.duration
                     setattr(self.action, "waited_dur", True)
                 print("Waiting for " + str(sleep_time) + "s with status: " + self.status)
                 time.sleep(sleep_time)
@@ -210,27 +217,45 @@ class Drone(Api):
         return self._command(adress=self.swarm_adress+"/"+str(self.ID), command=command)
 
     #funcs
-    def assign_job(self, delivery_paths:list, packages:list, swarm:Swarm):
-        swarm.update({self.ID:"BUSY"})
+    def assign_job(self, delivery_paths:list, packages:list):
+        self.swarm.drone_jobs.update({self.ID:"BUSY"})
         for package in packages:
             self.load_Package(package)
 
+        self.takeoff()
         for path in delivery_paths:
+            print("Do path:"+str(path))
             for node in path:
-                self.goto(float(node[0]), float(node[1]), float(self.flight_heigth))
+                print(node)
+                self.goto((float(node[0]), float(node[1])))
 
         self.do_delivery(self.packages.pop())
 
         for path in reversed(delivery_paths):
-            for node in (path):
-                self.goto(float(node[0]), float(node[1]), float(self.flight_heigth))
-        swarm.update({self.ID:"FREE"})
+            for node in reversed(path):
+                self.goto((float(node[0]), float(node[1])))
+        self.swarm.drone_jobs.update({self.ID:"FREE"})
 
 
     def do_delivery(self, package:Package):
-        self.land(height=0.2, vel=0.4)
+        self.lower()
         self.deliver(package)
-        self.takeoff()
+
+    def lower(self):
+        print("Goto waiting")
+        self._wait_for_task()
+
+        # check bugs
+        if (self.z == 0):
+            raise Exception("I'm not in the air!")
+
+        command = "goto?x=" + str(float(self.x)) + "&y=" + str(float(self.y)) + "&z=" + str(
+            float(0.1)) + "&yaw=" + str(self.yaw) + "&v=" + str(0.4)
+        action_dict = self._drone_command(command)
+        print("Drone " + str(self.ID) + " Lowering")
+        action = Action(action_dict)
+        setattr(self, "action", action)
+        return action
 
     #API
     def connect(self, radio:int=0):
@@ -288,9 +313,8 @@ class Drone(Api):
         self._wait_for_task()
         command="deliver?package_id="+str(package.id)
         register = self._drone_command(command=command)
-        action = Action(register)
         self.load -= package.weight
-        setattr(self.action, action)
+        setattr(self, "action", None)
         return register["success"]
 
     def calibrate(self)->bool:

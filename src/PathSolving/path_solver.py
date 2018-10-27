@@ -20,7 +20,7 @@ def do(input_list):
             ])
 
     def init_graph():
-        offset = 0.4 #meter
+        offset = 0.5 #meter
         G=nx.Graph()
         colors = []
         sizes = []
