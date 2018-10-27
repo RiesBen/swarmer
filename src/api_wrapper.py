@@ -2,12 +2,32 @@ import json
 import requests
 import src.coordinates.coord as coord
 
+class Package:
+    coordinates: (int, int, int)=None
+    weight: float = None
+    id :str = None
+
+    def __init__(self, coordinates:(int, int, int), weight:float, id:str):
+        self.coordinates = coordinates
+        self.weight = weight
+        self.id = id
+
 class Api:
     server_id:str = None
     def __init__(self, server_id:str="http://10.4.14.248:5000/api"):
         self.server_id=server_id
+        arena = self.get_arena()
+        self.min_x = arena["min_x"]
+        self.min_y = arena["min_y"]
+        self.min_z = arena["min_z"]
+        self.max_x = arena["max_x"]
+        self.max_y = arena["max_y"]
+        self.max_z = arena["max_z"]
+        self.buildings = arena["buildings"]
 
-    def _command(self, adress: str, command: str) -> dict:
+
+
+    def _command(self, adress: str, command: str) -> dict or bool:
             try:
                 print(self.server_id + "/" + command)
                 r = requests.get(url=adress + "/" + command)
@@ -28,7 +48,7 @@ class Api:
                     "Could not convert json:\n " + adress + "/" + command + "\n got a following text: \n" + r.text)
             return result
 
-    def _api_command(self, command: str) -> dict:
+    def _api_command(self, command: str) -> dict or bool:
         return self._command(adress=self.server_id, command=command)
 
     def get_arena(self) -> dict:
@@ -38,21 +58,24 @@ class Api:
 class Swarm(Api):
     id:str = None
     swarm_adress:str = None
-    swarm_drones:list = []
+    droneIDs:list = []
+    packages: list = []
 
     def __init__(self, swarm_id:str, server_id:str = "http://10.4.14.248:5000/api", swarm_drones=[34,35,36]):
         super().__init__(server_id=server_id)
         self.id = swarm_id
         self.swarm_adress = server_id+"/"+self.id
-        self.swarm_drones = swarm_drones
+        self.droneIDs = swarm_drones
 
-    def _swarm_command(self, command:str)->dict:
+    def _swarm_command(self, command:str)->dict  or bool:
         return self._command(adress=self.swarm_adress, command=command)
 
     #SWARM FUNCS
-    def get_package(self) -> dict:
+    def get_package(self) -> Package:
         command = "package"
-        return self._swarm_command(command=command)
+        packages = self._swarm_command(command=command)
+
+        return Package(coordinates=packages["coordinates"], weight=packages["weight"], id=packages["id"])
 
     def print_deliveries(self) -> dict:
         command="print_deliveries"
@@ -72,7 +95,7 @@ class Swarm(Api):
         return self._swarm_command(command=command)
 
     #DRONE FUNC
-    def drone_connect(self, droneID:int, radio:int=0):
+    def drone_connect(self, droneID:int, radio:int=0)->dict:
         command=str(droneID)+"/connect?r="+str(radio)+"&c=98&a=E7E7E7E7"+str(droneID)+"&dr=2M"
         drone = self._swarm_command(command=command)
         return drone
@@ -92,7 +115,7 @@ class Swarm(Api):
         register = self._swarm_command(command)
         return register["success"]
 
-    def drone_goto(self, droneID:int, pos:coord.Node=coord.Node(0,0,0), vel:float=100, yaw:float = 0.0)->dict:
+    def drone_goto(self, droneID:int, pos:(int,int,int)=(0,0,0), vel:float=100, yaw:float = 0.0)->dict:
         command=str(droneID)+"/goto?x="+str(pos.x)+"&y="+str(pos.y)+"&z="+str(pos.z)+"&yaw="+str(yaw)+"&v="+str(vel)
         register = self._swarm_command(command)
         return register
@@ -112,7 +135,7 @@ class Swarm(Api):
         register = self._swarm_command(command=command)
         return register
 
-    def drone_calibrate(self, droneID:int,):
+    def drone_calibrate(self, droneID:int,)->bool:
         command=str(droneID)+"/calibrate"
         register = self._swarm_command(command)
         return register["success"]
@@ -129,7 +152,7 @@ class Drone(Api):
         self.ID = droneID
         self.capacity = capacity
 
-    def _drone_command(self, command:str)->dict:
+    def _drone_command(self, command:str)->dict or bool:
         return self._command(adress=self.swarm_adress+"/"+str(self.ID), command=command)
 
     def connect(self, radio:int=0):
@@ -142,17 +165,17 @@ class Drone(Api):
         register = self._drone_command(command=command)
         return register["success"]
 
-    def takeoff(self, height:float=10, vel:float=100)->bool:
+    def takeoff(self, height:float=1, vel:float=100)->dict:
         command="takeoff?z="+str(height)+"&v="+str(vel)
         register = self._drone_command(command)
-        return register["success"]
+        return register
 
-    def land(self, height:float=0, vel:float=100)->bool:
+    def land(self, height:float=0, vel:float=10)->dict:
         command="land?z="+str(height)+"&v="+str(vel)
         register = self._drone_command(command)
-        return register["success"]
+        return register
 
-    def goto(self, pos:coord.Node=coord.Node(0,0,0), vel:float=100, yaw:float = 0.0)->dict:
+    def goto(self, pos:coord.Node=coord.Node(0,0,0), vel:float=10, yaw:float = 0.0)->dict:
         command="goto?x="+str(pos.x)+"&y="+str(pos.y)+"&z="+str(pos.z)+"&yaw="+str(yaw)+"&v="+str(vel)
         register = self._drone_command(command)
         return register
@@ -167,12 +190,14 @@ class Drone(Api):
         register = self._drone_command(command=command)
         return register
 
-    def deliver(self, packageID:int):
+    def deliver(self, packageID:int)->dict:
         command="deliver?package_id="+str(packageID)
         register = self._drone_command(command=command)
         return register
 
-    def calibrate(self):
+    def calibrate(self)->bool:
         command="calibrate"
         register = self._drone_command(command)
         return register["success"]
+
+
