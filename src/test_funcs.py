@@ -1,9 +1,9 @@
 from src import api_wrapper as api
 import time
 
-execute_it=False
+execute_it=True
 
-swarm = api.Swarm(swarm_id="Swarmer", server_id="http://10.4.14.248:5000/api")
+swarm = api.Swarm(swarm_id="Swarmer", server_id="http://10.4.14.37:5000/api")
 
 arena = swarm.get_arena()
 print("ARENA:\n",arena)
@@ -16,7 +16,7 @@ print("BUILDING: ",buildingOne)
 drone_ids = swarm.droneIDs
 print(drone_ids)
 
-droneOne = api.Drone(droneID=drone_ids[0], swarm=swarm)
+droneOne = api.Drone(droneID=drone_ids[1], swarm=swarm)
 
 #Do
 try:
@@ -26,15 +26,20 @@ except Exception as err:
 print(registered)
 
 #generate packages
-packages = [swarm.get_package() for x in range(10)]
-print([x.weight for x in packages])
+#packages = [swarm.get_package() for x in range(10)]
+#print([x.weight for x in packages])
 
 if execute_it:
-    register_drone = droneOne.connect()
-    take_off = droneOne.takeoff(height=1, vel=0.1)
-    print(take_off)
-    time.sleep(5)
-    landing = droneOne.land(height=0, vel=0.1)
-    print(landing)
-    time.sleep(5)
-    disconnect = droneOne.disconnect()
+    try:
+        register_drone = droneOne.connect()
+        droneOne.takeoff(height=0.3, vel=1)
+
+        droneOne.goto(pos=(1.0, 1.6))
+        droneOne.do_delivery()
+        droneOne.goto(pos=(2.2,1.6,0.0))
+
+        droneOne.land(height=0, vel=1)
+        droneOne.disconnect()
+    except Exception as err:
+        droneOne.disconnect()
+        print("error: "+str(err.args))

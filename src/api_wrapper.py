@@ -3,14 +3,6 @@ import requests
 import enum
 import time
 
-class drone_state(enum.Enum):
-    IDLE = "IDLE"
-    OFFLINE = "OFFLINE"
-    HOVERING = "HOVERING"
-    STARTING = "STARTING"
-    LANDING = "LANDING"
-    NAVIGATING = "NAVIGATING"
-
 class Package:
     coordinates: (int, int, int)=None
     weight: float = None
@@ -29,7 +21,7 @@ class Action:
     target_y: float = None
     target_yaw: float = None
     target_z: float = None
-    waited_dur: bool = None
+    waited_dur: bool = False
 
     def __init__(self, action: dict):
         att_list = ["duration", "relative", "target_x", "target_y", "target_z", "target_yaw"]
@@ -39,7 +31,7 @@ class Action:
 
             else:
                 raise Exception("Action got an unexpected attribute: "+x+"\n val: "+str(action[x]))
-        waited_dur = False
+        self.waited_dur = False
 
 
 class Api:
@@ -134,90 +126,126 @@ class Drone(Api):
     capacity:float = None
     action:Action = None
     status:str = None
+    sleep_update: int = 5
+    accepted_variance = 0.1
     def __init__(self, droneID:int, swarm:Swarm, capacity:float=1.0):
         super().__init__(server_id=swarm.server_id)
         self.swarm_adress = swarm.swarm_adress
         self.ID = droneID
         self.capacity = capacity
 
-    def _wait_for_task(self):
-        while True:
-            if(any([self.status == x for x in [drone_state.LANDING, drone_state.STARTING, drone_state.NAVIGATING]])):
-                if(self.action.waited_dur):
-                    time.sleep(3)
-                else:
-                    time.sleep(0.95*self.action.duration)
-                continue
+    def _reached_target(self):
+        print(vars(self.action))
+        targets = {x:getattr(self.action, x)  for x in vars(self.action) if "target" in x}
+        actual_pos = {"x":self.x, "y":self.y, "z":self.z}
+        var_pos = [self.var_x, self.var_y, self.var_z]
+        print("Target params: "+str(targets))
+        print("actual_vars: "+str(actual_pos))
+        accepted_var=self.accepted_variance
 
-            elif any([self.status == x for x in  [drone_state.OFFLINE]]):
+        #check if pos is reached
+        for target in targets:
+            if(targets[target] >= actual_pos[target.replace("target_", "")]-accepted_var and targets[target]  <= actual_pos[target.replace("target_", "")]+accepted_var ):
+                continue
+            else:
+                return False
+        return True
+
+    def _wait_for_task(self):
+        self._update_status()
+        if(self.action == None):
+            return True
+        while True:
+            if(not self._reached_target()):
+                if(self.action.waited_dur):
+                    sleep_time = self.sleep_update
+                else:
+                    sleep_time = 0.95*self.action.duration
+                    setattr(self.action, "waited_dur", True)
+
+                print("Waiting for " + str(sleep_time) + "s with status: " + self.status)
+                time.sleep(sleep_time)
+                self._update_status()
+                time.sleep(1)
+                continue
+            elif any([self.status == x for x in  ["OFFLINE"]]):
                 raise Exception("DRONE - ACTION FAILED drone is : "+self.status)
             else:
                 self._update_status()
+                time.sleep(1)
                 break
 
-    def _update_status(self, status:dict):
-        for x in status:
-            if x in ["id", "var_x", "var_y", "var_z", "x", "y", "z", "yaw", "status", "battery_voltage", "battery_percentage"]:
-                setattr(self, x, status[x])
 
+    def _update_status(self)->dict:
+        command="status"
+        status = self._drone_command(command=command)
 
+        #update class attributes
+        try:
+            for x in status:
+                if x in ["id", "var_x", "var_y", "var_z", "x", "y", "z", "yaw", "status", "battery_voltage", "battery_percentage"]:
+                    setattr(self, x, status[x])
+        except Exception as err:
+            raise Exception("Could not update. got: "+str(status))
+        return status
 
     def _drone_command(self, command:str)->dict or bool:
         return self._command(adress=self.swarm_adress+"/"+str(self.ID), command=command)
 
     def connect(self, radio:int=0):
         command="connect?r="+str(radio)+"&c=98&a=E7E7E7E7"+str(self.ID)+"&dr=2M"
-        status = self._drone_command(command=command)
-        self._update_status(status)
+        self._drone_command(command=command)
 
     def disconnect(self)->bool:
         self._wait_for_task()
         command="disconnect"
         register = self._drone_command(command=command)
-        self._update_status()
         return register["success"]
 
-    def takeoff(self, height:float=1, vel:float=100)->dict:
+    def takeoff(self, height:float=0.3, vel:float=1)->dict:
         self._wait_for_task()
         command="takeoff?z="+str(height)+"&v="+str(vel)
         register = self._drone_command(command)
+        setattr(self, "action", Action(register))
         self._update_status()
         return register
 
-    def land(self, height:float=0, vel:float=10)->dict:
+    def land(self, height:float=0, vel:float=1)->dict:
         self._wait_for_task()
         command="land?z="+str(height)+"&v="+str(vel)
         register = self._drone_command(command)
-        self._update_status()
+        setattr(self, "action", Action(register))
+        print("Drone: "+str(self.ID)+"\t Landing")
         return register
 
-    def goto(self, pos:(0,0,0)=(0,0,0), vel:float=10, yaw:float = 0.0)->float:
+    def goto(self, pos:(int,int,int)=(0,0,0), vel:float=1, yaw:float = 0.0)->float:
         self._wait_for_task()
+
+        #check bugs
+        if(self.z == 0):
+            raise Exception("I'm not in the air!")
+
         command="goto?x="+str(pos.x)+"&y="+str(pos.y)+"&z="+str(pos.z)+"&yaw="+str(yaw)+"&v="+str(vel)
         action_dict = self._drone_command(command)
         print("Drone "+self.ID+" is navigating to: "+str(pos))
         action = Action(action_dict)
-        setattr(self, "action",action)
-        self._update_status()
+        setattr(self, "action", action)
         return action
 
     def stop(self)->dict:
         command="stop"
         register = self._drone_command(command=command)
-        self._update_status()
+        setattr(self, "action", Action(register))
         return register
 
     def status(self)->dict:
-        command="status"
-        status = self._drone_command(command=command)
-        self._update_status(status)
+        status = self._update_status()
         return status
 
     def deliver(self, packageID:int)->dict:
         self._wait_for_task()
         command="deliver?package_id="+str(packageID)
         register = self._drone_command(command=command)
-        self._update_status()
         return register
 
     def calibrate(self)->bool:
@@ -225,4 +253,7 @@ class Drone(Api):
         register = self._drone_command(command)
         return register["success"]
 
-
+    def do_delivery(self):
+        self.land()
+        self.deliver()
+        self.takeoff()
