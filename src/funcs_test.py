@@ -1,4 +1,5 @@
 from src import api_wrapper as api
+from src.PathSolving import path_solver as ps
 import time
 
 execute_it=True
@@ -26,8 +27,15 @@ except Exception as err:
     print("Was already Registered")
 
 #generate packages
+source_node=[2.2, 1.6]
 packages = [swarm.get_package() for x in range(2)]
 print([x.weight for x in packages])
+
+#generate_paths:
+path = ps.do([(source_node, package.coordinates[:2]) for package in packages])
+print(path)
+
+exit()
 
 if execute_it:
     try:

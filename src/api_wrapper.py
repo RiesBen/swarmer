@@ -1,6 +1,5 @@
 import json
 import requests
-import enum
 import time
 
 class Package:
@@ -92,7 +91,7 @@ class Swarm(Api):
         self.id = swarm_id
         self.swarm_adress = server_id+"/"+self.id
         self.droneIDs = swarm_drones
-        self.drone_jobs = {x:[] for x in self.droneIDs}
+        self.drone_jobs = {x:"FREE" for x in self.droneIDs}
 
     def _swarm_command(self, command:str)->dict  or bool:
         return self._command(adress=self.swarm_adress, command=command)
@@ -202,14 +201,22 @@ class Drone(Api):
         return self._command(adress=self.swarm_adress+"/"+str(self.ID), command=command)
 
     #funcs
-    def assign_job(self, delivery_path:list):
-        for x in delivery_path:
-            self.goto(float(x[0]), float(x[1]), float(x[2]))
+    def assign_job(self, delivery_paths:list, packages:list, swarm:Swarm):
+        swarm.update({self.ID:"BUSY"})
+        for package in packages:
+            self.load_Package(package)
 
-        self.do_delivery()
+        for path in delivery_paths:
+            for node in path:
+                self.goto(float(node[0]), float(node[1]), float(self.flight_heigth))
 
-        for x in reversed(delivery_path):
-            self.goto(float(x[0]), float(x[1]), float(x[2]))
+        self.do_delivery(self.packages.pop())
+
+        for path in reversed(delivery_paths):
+            for node in (path):
+                self.goto(float(node[0]), float(node[1]), float(self.flight_heigth))
+        swarm.update({self.ID:"DONE"})
+
 
     def do_delivery(self, package:Package):
         self.land(height=0.15, vel=0.3)
