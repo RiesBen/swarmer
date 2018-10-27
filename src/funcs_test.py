@@ -1,27 +1,47 @@
 from src import api_wrapper as api
+import time
 
-swarm = api.Swarm("Swarmer")
+execute_it=True
+
+swarm = api.Swarm(swarm_id="Swarmer", server_id="http://10.4.14.28:5000/api")
+#248, 28, 37
+
 arena = swarm.get_arena()
-print("ARENA:\n",arena)
+#print("ARENA:\n",arena)
 
+#print(swarm.buildings )
+buildingOne = swarm.buildings[0]
 buildingOne = arena["buildings"][0]
-print("BUILDING: ",buildingOne)
+#print("BUILDING: ",buildingOne)
 
-packages = [swarm.get_package() for x in range(10)]
-print(packages)
+drone_ids = swarm.droneIDs
+#print(drone_ids)
 
-drone_ids = swarm.swarm_drones
-print(drone_ids)
-
-droneOne = api.Drone(droneID=drone_ids[0], swarm=swarm)
+droneOne = api.Drone(droneID=drone_ids[1], swarm=swarm)
 
 #Do
-registered= swarm.register()
-print(registered)
+try:
+    registered= swarm.register()
+except Exception as err:
+    print("Was already Registered")
 
+#generate packages
+#packages = [swarm.get_package() for x in range(10)]
+#print([x.weight for x in packages])
 
-register_drone = droneOne.connect()
-take_off = droneOne.takeoff(height=20, vel=100)
-landing = droneOne.land(height=0, vel=100)
-disconnect = droneOne.disconnect()
+if execute_it:
+    try:
+        register_drone = droneOne.connect()
+        droneOne.takeoff(height=0.3, vel=1)
 
+        droneOne.goto(pos=(0.1, 0.16))
+        droneOne.do_delivery()
+        #droneOne.goto(pos=(2.2,1.6,0.0))
+
+        droneOne.land(height=0, vel=1)
+        droneOne.disconnect()
+
+    except Exception as err:
+        droneOne.land()
+        droneOne.disconnect()
+        print("error: "+str(err.args))
