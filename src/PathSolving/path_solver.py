@@ -3,6 +3,24 @@ from shapely.geometry import LineString
 import matplotlib.pyplot as plt
 import networkx as nx
 
+def get_point_or_idx(input):
+    sites = np.array([
+            [2.2, 1.6], #[2.3,1.6],
+            [2.6, 0.6], #[2.7,0.5],
+            [3.4, 1.4], #[3.7,1.5],
+            [2.4, 3.4], #[2.5,3.4],
+            [0.6, 2.2], #[0.5,2.1],
+            [1.4, 3.2], #[1.4,3.2],
+            [1.0, 1.6], #[0.8,1.6],
+            [3.6, 0.6], #[3.7,0.5],
+            [3.2, 3.2], #[3.3,3.1],
+            ])
+    if type(input) is int:
+        return sites[input - 1]
+    else:
+        return np.argmax(np.all(np.isclose(sites, input),1))+1
+#print(get_point_or_idx([3.2,3.2]))
+#print(get_point_or_idx(3))
 
 def do(input_list):
     buildings = np.array([[2.0, 2.8, 0], [1.5, 1.0, 0], [3.15, 0.7, 0], [3.0, 2.0, 0]])
