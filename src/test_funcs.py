@@ -1,6 +1,6 @@
 from src import api_wrapper as api
 
-api = api.Api("swarmer")
+api = api.Swarm("swarmer")
 
 
 
@@ -12,12 +12,13 @@ buildingOne = arena["buildings"][0]
 
 print(buildingOne)
 
-registered= api.register_swarm()
+registered= api.swarm_register()
 print(registered)
 
 drones = [34,35,36]
 
-register_drone = api.connect_drone(droneID=drones[0])
+#register_drone = api.connect_drone(droneID=drones[1])
 
-#packages = [api.get_package() for x in range(10)]
-#print(packages)
+#unregister = api.disconnect_drone(drones[1])
+packages = [api.get_package() for x in range(10)]
+print(packages)
