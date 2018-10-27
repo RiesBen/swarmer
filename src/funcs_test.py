@@ -26,21 +26,24 @@ except Exception as err:
     print("Was already Registered")
 
 #generate packages
-#packages = [swarm.get_package() for x in range(10)]
-#print([x.weight for x in packages])
+packages = [swarm.get_package() for x in range(2)]
+print([x.weight for x in packages])
 
 if execute_it:
     try:
         register_drone = droneOne.connect()
         #droneOne.calibrate()
+        droneOne.load_Package(packages[0])
         droneOne.takeoff(height=0.3, vel=1)
         print("GOTO!")
         droneOne.goto(pos=(1.0, 1.6, 0.3), vel=0.4)
-        droneOne.do_delivery()
-        #droneOne.goto(pos=(2.2,1.6,0.0))
+        droneOne.do_delivery(droneOne.packages[0])
+        droneOne.goto(pos=(2.2,1.6))
         print("LAAAND")
         droneOne.land(height=0, vel=0.3)
         droneOne.disconnect()
+
+        swarm.print_deliveries()
 
     except Exception as err:
         droneOne.land()

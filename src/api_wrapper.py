@@ -129,7 +129,9 @@ class Drone(Api):
     status:str = None
     sleep_update: int = 2
     accepted_variance = 0.1
-    package:Package = None
+    packages:Package = []
+    load = 0
+    flight_heigth = 0.3
 
     def __init__(self, droneID:int, swarm:Swarm, capacity:float=1.0):
         super().__init__(server_id=swarm.server_id)
@@ -137,9 +139,10 @@ class Drone(Api):
         self.ID = droneID
         self.capacity = capacity
 
-    def load_Package(self):
-        #self.
-        pass
+    def load_Package(self, package:Package):
+        self.package.append(package)
+        self.load += package.weight
+
     def _reached_target(self):
         targets = {x:getattr(self.action, x)  for x in vars(self.action) if "target" in x and not "yaw" in x}
         actual_pos = {"x":self.x, "y":self.y, "z":self.z, "yaw":self.yaw}
@@ -208,9 +211,9 @@ class Drone(Api):
         for x in reversed(delivery_path):
             self.goto(float(x[0]), float(x[1]), float(x[2]))
 
-    def do_delivery(self):
-        self.land(height=0.1, vel=0.3)
-        time.sleep(2)
+    def do_delivery(self, package:Package):
+        self.land(height=0.15, vel=0.3)
+        self.do_delivery(package)
         self.takeoff()
 
     #API
@@ -225,7 +228,7 @@ class Drone(Api):
         register = self._drone_command(command=command)
         return register["success"]
 
-    def takeoff(self, height:float=0.3, vel:float=1)->dict:
+    def takeoff(self, height:float=flight_heigth, vel:float=1)->dict:
         self._wait_for_task()
         command="takeoff?z="+str(height)+"&v="+str(vel)
         register = self._drone_command(command)
@@ -240,7 +243,7 @@ class Drone(Api):
         print("Drone: "+str(self.ID)+"\t Landing")
         return register
 
-    def goto(self, pos:(float,float,float)=(1,1,0), vel:float=0.5, yaw:float = 0.0)->float:
+    def goto(self, pos:(float,float)=(1,1), vel:float=0.5, yaw:float = 0.0)->float:
         print("Goto waiting")
         self._wait_for_task()
 
@@ -248,7 +251,7 @@ class Drone(Api):
         if(self.z == 0):
             raise Exception("I'm not in the air!")
 
-        command="goto?x="+str(float(pos[0]))+"&y="+str(float(pos[1]))+"&z="+str(float(pos[2]))+"&yaw="+str(yaw)+"&v="+str(vel)
+        command="goto?x="+str(float(pos[0]))+"&y="+str(float(pos[1]))+"&z="+str(float(self.flight_heigth))+"&yaw="+str(yaw)+"&v="+str(vel)
         action_dict = self._drone_command(command)
         print("Drone "+str(self.ID)+" is navigating to: "+str(pos))
         action = Action(action_dict)
@@ -265,13 +268,14 @@ class Drone(Api):
         status = self._update_status()
         return status
 
-    def deliver(self, packageID:int)->dict:
+    def deliver(self, package:Package)->dict:
         self._wait_for_task()
-        command="deliver?package_id="+str(packageID)
+        command="deliver?package_id="+str(package.id)
         register = self._drone_command(command=command)
         action = Action(register)
+        self.load -= package.weight
         setattr(self.action, action)
-        return register
+        return register["success"]
 
     def calibrate(self)->bool:
         command="calibrate"
