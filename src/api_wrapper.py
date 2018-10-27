@@ -1,5 +1,15 @@
 import json
 import requests
+import enum
+import time
+
+class drone_state(enum.Enum):
+    IDLE = "IDLE"
+    OFFLINE = "OFFLINE"
+    HOVERING = "HOVERING"
+    STARTING = "STARTING"
+    LANDING = "LANDING"
+    NAVIGATING = "NAVIGATING"
 
 class Package:
     coordinates: (int, int, int)=None
@@ -10,6 +20,27 @@ class Package:
         self.coordinates = coordinates
         self.weight = weight
         self.id = id
+
+
+class Action:
+    duration: float = None
+    relative: bool = None
+    target_x: float = None
+    target_y: float = None
+    target_yaw: float = None
+    target_z: float = None
+    waited_dur: bool = None
+
+    def __init__(self, action: dict):
+        att_list = ["duration", "relative", "target_x", "target_y", "target_z", "target_yaw"]
+        for x in action:
+            if(x in att_list):
+                setattr(self, x, action[x])
+
+            else:
+                raise Exception("Action got an unexpected attribute: "+x+"\n val: "+str(action[x]))
+        waited_dur = False
+
 
 class Api:
     server_id:str = None
@@ -54,7 +85,11 @@ class Api:
         command="arena"
         return self._api_command(command=command)
 
+
+
+
 class Swarm(Api):
+
     id:str = None
     swarm_adress:str = None
     droneIDs:list = []
@@ -93,105 +128,96 @@ class Swarm(Api):
         command="status"
         return self._swarm_command(command=command)
 
-    #DRONE FUNC
-    def drone_connect(self, droneID:int, radio:int=0)->dict:
-        command=str(droneID)+"/connect?r="+str(radio)+"&c=98&a=E7E7E7E7"+str(droneID)+"&dr=2M"
-        drone = self._swarm_command(command=command)
-        return drone
-
-    def drone_disconnect(self, droneID:int)->bool:
-        command=str(droneID)+"/disconnect"
-        register = self._swarm_command(command=command)
-        return register["success"]
-
-    def drone_takeoff(self, droneID:int, height:float=10, vel:float=100)->bool:
-        command=str(droneID)+"/takeoff?z="+str(height)+"&v="+str(vel)
-        register = self._swarm_command(command)
-        return register["success"]
-
-    def drone_land(self, droneID:int, height:float=0, vel:float=100)->bool:
-        command=str(droneID)+"/land?z="+str(height)+"&v="+str(vel)
-        register = self._swarm_command(command)
-        return register["success"]
-
-    def drone_goto(self, droneID:int, pos:(int,int,int)=(0,0,0), vel:float=100, yaw:float = 0.0)->dict:
-        command=str(droneID)+"/goto?x="+str(pos.x)+"&y="+str(pos.y)+"&z="+str(pos.z)+"&yaw="+str(yaw)+"&v="+str(vel)
-        register = self._swarm_command(command)
-        return register
-
-    def drone_stop(self, droneID:int)->dict:
-        command=str(droneID)+"/stop"
-        register = self._swarm_command(command=command)
-        return register
-
-    def drone_status(self, droneID:int)->dict:
-        command=str(droneID)+"/status"
-        register = self._swarm_command(command=command)
-        return register
-
-    def drone_deliver(self, droneID:int, packageID:int):
-        command=str(droneID)+"/deliver?package_id="+str(packageID)
-        register = self._swarm_command(command=command)
-        return register
-
-    def drone_calibrate(self, droneID:int,)->bool:
-        command=str(droneID)+"/calibrate"
-        register = self._swarm_command(command)
-        return register["success"]
-
-
 class Drone(Api):
     ID:int = None
     swarm_adress:str = None
     capacity:float = None
-
+    action:Action = None
+    status:str = None
     def __init__(self, droneID:int, swarm:Swarm, capacity:float=1.0):
         super().__init__(server_id=swarm.server_id)
         self.swarm_adress = swarm.swarm_adress
         self.ID = droneID
         self.capacity = capacity
 
+    def _wait_for_task(self):
+        while True:
+            if(any([self.status == x for x in [drone_state.LANDING, drone_state.STARTING, drone_state.NAVIGATING]])):
+                if(self.action.waited_dur):
+                    time.sleep(3)
+                else:
+                    time.sleep(0.95*self.action.duration)
+                continue
+
+            elif any([self.status == x for x in  [drone_state.OFFLINE]]):
+                raise Exception("DRONE - ACTION FAILED drone is : "+self.status)
+            else:
+                self._update_status()
+                break
+
+    def _update_status(self, status:dict):
+        for x in status:
+            if x in ["id", "var_x", "var_y", "var_z", "x", "y", "z", "yaw", "status", "battery_voltage", "battery_percentage"]:
+                setattr(self, x, status[x])
+
+
+
     def _drone_command(self, command:str)->dict or bool:
         return self._command(adress=self.swarm_adress+"/"+str(self.ID), command=command)
 
     def connect(self, radio:int=0):
         command="connect?r="+str(radio)+"&c=98&a=E7E7E7E7"+str(self.ID)+"&dr=2M"
-        drone = self._drone_command(command=command)
-        return drone
+        status = self._drone_command(command=command)
+        self._update_status(status)
 
     def disconnect(self)->bool:
+        self._wait_for_task()
         command="disconnect"
         register = self._drone_command(command=command)
+        self._update_status()
         return register["success"]
 
     def takeoff(self, height:float=1, vel:float=100)->dict:
+        self._wait_for_task()
         command="takeoff?z="+str(height)+"&v="+str(vel)
         register = self._drone_command(command)
+        self._update_status()
         return register
 
     def land(self, height:float=0, vel:float=10)->dict:
+        self._wait_for_task()
         command="land?z="+str(height)+"&v="+str(vel)
         register = self._drone_command(command)
+        self._update_status()
         return register
 
-    def goto(self, pos:coord.Node=coord.Node(0,0,0), vel:float=10, yaw:float = 0.0)->dict:
+    def goto(self, pos:(0,0,0)=(0,0,0), vel:float=10, yaw:float = 0.0)->float:
+        self._wait_for_task()
         command="goto?x="+str(pos.x)+"&y="+str(pos.y)+"&z="+str(pos.z)+"&yaw="+str(yaw)+"&v="+str(vel)
-        register = self._drone_command(command)
-        return register
+        action_dict = self._drone_command(command)
+        print("Drone "+self.ID+" is navigating to: "+str(pos))
+        action = Action(action_dict)
+        setattr(self, "action",action)
+        self._update_status()
+        return action
 
     def stop(self)->dict:
         command="stop"
         register = self._drone_command(command=command)
+        self._update_status()
         return register
 
     def status(self)->dict:
         command="status"
-        register = self._drone_command(command=command)
-        return register
+        status = self._drone_command(command=command)
+        self._update_status(status)
+        return status
 
     def deliver(self, packageID:int)->dict:
+        self._wait_for_task()
         command="deliver?package_id="+str(packageID)
         register = self._drone_command(command=command)
+        self._update_status()
         return register
 
     def calibrate(self)->bool:
