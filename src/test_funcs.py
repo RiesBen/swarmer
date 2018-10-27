@@ -16,7 +16,7 @@ print(drone_ids)
 droneOne = api.Drone(droneID=drone_ids[0], swarm=swarm)
 
 #Do
-registered= api.swarm_register()
+registered= swarm.register()
 print(registered)
 
 
