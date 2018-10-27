@@ -75,9 +75,6 @@ class Api:
         command="arena"
         return self._api_command(command=command)
 
-
-
-
 class Swarm(Api):
 
     id:str = None
@@ -85,6 +82,7 @@ class Swarm(Api):
     droneIDs:list = []
     packages: list = []
     drone_jobs:dict = {}
+    drones:list =[]
 
     def __init__(self, swarm_id:str, server_id:str = "http://10.4.14.248:5000/api", swarm_drones=[34,35,36]):
         super().__init__(server_id=server_id)
@@ -93,8 +91,19 @@ class Swarm(Api):
         self.droneIDs = swarm_drones
         self.drone_jobs = {x:"FREE" for x in self.droneIDs}
 
+        for ind,x in enumerate(self.droneIDs):
+            tmp_drone = Drone(droneID=x, swarm=self)
+            self.drones.append(tmp_drone)
+            tmp_drone.connect()
+
+    def schedule_jobs(self):
+        for droneID in self.droneIDs:
+            if(self.drone_jobs[droneID] == "FREE"):
+                self.drones[droneID]
+
     def _swarm_command(self, command:str)->dict  or bool:
         return self._command(adress=self.swarm_adress, command=command)
+
 
     #SWARM FUNCS
     def get_package(self) -> Package:
@@ -139,7 +148,7 @@ class Drone(Api):
         self.capacity = capacity
 
     def load_Package(self, package:Package):
-        self.package.append(package)
+        self.packages.append(package)
         self.load += package.weight
 
     def _reached_target(self):
@@ -215,12 +224,12 @@ class Drone(Api):
         for path in reversed(delivery_paths):
             for node in (path):
                 self.goto(float(node[0]), float(node[1]), float(self.flight_heigth))
-        swarm.update({self.ID:"DONE"})
+        swarm.update({self.ID:"FREE"})
 
 
     def do_delivery(self, package:Package):
-        self.land(height=0.15, vel=0.3)
-        self.do_delivery(package)
+        self.land(height=0.2, vel=0.4)
+        self.deliver(package)
         self.takeoff()
 
     #API

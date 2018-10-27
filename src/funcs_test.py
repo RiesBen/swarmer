@@ -36,17 +36,15 @@ path = ps.do([(source_node, package.coordinates[:2]) for package in packages])
 print(path)
 
 exit()
-
 if execute_it:
     try:
-        register_drone = droneOne.connect()
-        #droneOne.calibrate()
+        droneOne.calibrate()
         droneOne.load_Package(packages[0])
         droneOne.takeoff(height=0.3, vel=1)
         print("GOTO!")
-        droneOne.goto(pos=(1.0, 1.6, 0.3), vel=0.4)
+        droneOne.goto(pos=(1.0, 1.6), vel=0.6)
         droneOne.do_delivery(droneOne.packages[0])
-        droneOne.goto(pos=(2.2,1.6))
+        droneOne.goto(pos=(2.2,1.6), vel=0.6)
         print("LAAAND")
         droneOne.land(height=0, vel=0.3)
         droneOne.disconnect()
