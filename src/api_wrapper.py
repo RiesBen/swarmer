@@ -129,6 +129,7 @@ class Drone(Api):
     status:str = None
     sleep_update: int = 2
     accepted_variance = 0.1
+    package:Package = None
 
     def __init__(self, droneID:int, swarm:Swarm, capacity:float=1.0):
         super().__init__(server_id=swarm.server_id)
@@ -136,9 +137,12 @@ class Drone(Api):
         self.ID = droneID
         self.capacity = capacity
 
+    def load_Package(self):
+        #self.
+        pass
     def _reached_target(self):
-        targets = {x:getattr(self.action, x)  for x in vars(self.action) if "target" in x}
-        actual_pos = {"x":self.x, "y":self.y, "z":self.z}
+        targets = {x:getattr(self.action, x)  for x in vars(self.action) if "target" in x and not "yaw" in x}
+        actual_pos = {"x":self.x, "y":self.y, "z":self.z, "yaw":self.yaw}
         var_pos = [self.var_x, self.var_y, self.var_z]
         print("Target params: "+str(targets))
         print("actual_vars: "+str(actual_pos))
@@ -154,8 +158,9 @@ class Drone(Api):
         return True
 
     def _wait_for_task(self):
-        self._update_status()
+
         if(self.action == None):
+            print("DID not find previous Action")
             return True
 
         while True:
@@ -204,15 +209,15 @@ class Drone(Api):
             self.goto(float(x[0]), float(x[1]), float(x[2]))
 
     def do_delivery(self):
-        self.land()
-        self.deliver()
+        self.land(height=0.1, vel=0.3)
+        time.sleep(2)
         self.takeoff()
-
 
     #API
     def connect(self, radio:int=0):
         command="connect?r="+str(radio)+"&c=98&a=E7E7E7E7"+str(self.ID)+"&dr=2M"
         self._drone_command(command=command)
+        self._update_status()
 
     def disconnect(self)->bool:
         self._wait_for_task()
@@ -245,7 +250,7 @@ class Drone(Api):
 
         command="goto?x="+str(float(pos[0]))+"&y="+str(float(pos[1]))+"&z="+str(float(pos[2]))+"&yaw="+str(yaw)+"&v="+str(vel)
         action_dict = self._drone_command(command)
-        print("Drone "+self.ID+" is navigating to: "+str(pos))
+        print("Drone "+str(self.ID)+" is navigating to: "+str(pos))
         action = Action(action_dict)
         setattr(self, "action", action)
         return action
