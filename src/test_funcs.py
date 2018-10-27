@@ -1,9 +1,10 @@
 from src import api_wrapper as api
 
-api = api.Swarm("swarmer")
+swarm = api.Swarm("Swarmer")
+arena = swarm.get_arena()
+drone_ids = swarm.swarm_drones
 
-
-
+print(drone_ids)
 
 arena = api.get_arena()
 print(arena)
