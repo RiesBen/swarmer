@@ -142,7 +142,7 @@ class Drone(Api):
         register = self._drone_command(command=command)
         return register["success"]
 
-    def takeoff(self, droneID:int, height:float=10, vel:float=100)->bool:
+    def takeoff(self, height:float=10, vel:float=100)->bool:
         command="takeoff?z="+str(height)+"&v="+str(vel)
         register = self._drone_command(command)
         return register["success"]
