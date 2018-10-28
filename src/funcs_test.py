@@ -66,8 +66,10 @@ if execute_it:
         import time
         swarm.init_drones()
         for job in jobs[:4]:
-            swarm.schedule_jobs(job)
-        swarm.run_processes()
+            for drone in swarm.droneIDs:
+                swarm.schedule_jobs(job)
+            swarm.run_processes()
+
         while True:
             if(swarm.wait_for_jobs):
                 swarm.shutdown()

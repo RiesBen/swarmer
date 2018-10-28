@@ -144,7 +144,7 @@ class Swarm(Api):
         for p in self.processes:
             print("START")
             p.start()
-            time.sleep(1)
+            time.sleep(2)
 
         self.wait_for_jobs()
 
@@ -161,16 +161,7 @@ class Swarm(Api):
         for p in self.processes:
             p.join()
             print("Wait")
-        """
-        while True:
-            print("JOBS:",[x for x in self.drone_jobs.values()])
-            if(all([x == "FREE" for x in self.drone_jobs.values()])):
-                print("ALL Free!")
-                return True
-            else:
-                print("waiting for jobs")
-                time.sleep(5)
-        """
+
     def _swarm_command(self, command:str)->dict  or bool:
         return self._command(adress=self.swarm_adress, command=command)
 
@@ -319,7 +310,7 @@ class Drone(Api):
             self.goto((float(node[0]), float(node[1])))
 
         self.swarm.drone_jobs.update({self.ID:"FREE"})
-
+        return 0
 
     def do_delivery(self, package:Package):
         self.lower()
