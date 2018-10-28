@@ -385,9 +385,14 @@ class Drone(Api):
             found_clash = False
             for id in droneIDs:
                 od_status = self._other_drone(id)
-                if(self.ID > od_status["id"] and pos[0] == od_status["x"] and pos[1] == od_status["y"]):
+                od = [d for d in self.swarm.drones if(d.ID == id)]
+                current_coords = pos[0] == od_status["x"] and pos[1] == od_status["y"]
+                if(od.action != None):
+                    future_coords=(od.action.target_x == pos[0] and od.action.target_y == pos[1])
+                if(self.ID > od_status["id"] and (current_coords)or future_coords):
                     time.sleep(5)
                     found_clash = True
+                    print("WAIT FOUND CLASH!")
                 else:
                     continue
             i += 1

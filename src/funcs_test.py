@@ -65,7 +65,7 @@ if execute_it:
     try:
         import time
         swarm.init_drones()
-        for job in jobs[:3]:
+        for job in jobs[:4]:
             swarm.schedule_jobs(job)
         swarm.run_processes()
         while True:
