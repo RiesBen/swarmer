@@ -88,7 +88,7 @@ class Swarm(Api):
     drone_jobs:dict = {}
     drones:list =[]
     swarm_thread_pool:mp.Pool = None
-    active_jobs = {}
+    processes = []
 
     def __init__(self, swarm_id:str, server_id:str = "http://10.4.14.248:5000/api", swarm_drones=[34,35,36], arena:int=2):
         super().__init__(server_id=server_id)
@@ -114,31 +114,39 @@ class Swarm(Api):
 
     def shutdown(self):
         for drone in self.drones:
-            drone.land()
-            time.sleep(1)
-            drone.disconnect()
-
-    def schedule_jobs(self,delivery_path: list, packages:list):
+            try:
+                drone.land()
+                time.sleep(1)
+                drone.disconnect()
+            except:
+                continue
+                
+    def schedule_jobs(self,jobs):
+        job = jobs.pop()
+        print("new JOB")
+        print(job)
+        print(self.drone_jobs)
         assigned = False
-        tuple_list = []
         for ind,droneID in enumerate(self.droneIDs):
-            if(self.drone_jobs[droneID] == "FREE"):
-                #p =self.swarm_thread_pool.Process(target=self.drones[ind].assign_job, args=(delivery_path.pop(), packages.pop()))
-                #self.swarm_thread_pool.
-                t=
-                assigned=True
+            if(self.drone_jobs[droneID] == "FREE" or not droneID in self.drone_jobs):
+                self.drone_jobs.update({droneID:"BUSY"})
+                p=mp.Process(target=self.drones[ind].assign_job, args=job)
+                self.processes.append(p)
+                print(self.drone_jobs)
+                return p
 
         if not(assigned):
             time.sleep(7) #parameter!
-            return self.schedule_jobs(delivery_path, packages)
-        else:
-            p.start()
-            time.sleep(5)
+            return self.schedule_jobs(jobs)
 
-            pass
-          #  mp.Process(self.dr)
-              #  mp.Pool(processes=len(self.droneIDs)).starmap(self.swarm_assign_job, tuple_list)
-            return True
+    def run_processes(self):
+        print(self.processes)
+        for p in self.processes:
+            print("START")
+            p.start()
+
+        self.wait_for_jobs()
+
 
     def swarm_assign_job(self, drone_ID, job):
         self.drones[self.droneIDs.index(drone_ID)].assign_job(job)
@@ -148,15 +156,20 @@ class Swarm(Api):
         del self_dict['swarm_thread_pool']
         return self_dict
 
-    def check_jobs_done(self):
-        for droneID in self.droneIDs:
-            if(self.drone_jobs[droneID] == "FREE"):
-                pass
+    def wait_for_jobs(self):
+        for p in self.processes:
+            p.join()
+            print("Wait")
+        """
+        while True:
+            print("JOBS:",[x for x in self.drone_jobs.values()])
+            if(all([x == "FREE" for x in self.drone_jobs.values()])):
+                print("ALL Free!")
+                return True
             else:
-               return False
-
-        return True
-
+                print("waiting for jobs")
+                time.sleep(5)
+        """
     def _swarm_command(self, command:str)->dict  or bool:
         return self._command(adress=self.swarm_adress, command=command)
 
@@ -273,38 +286,36 @@ class Drone(Api):
         return self._command(adress=self.swarm_adress+"/"+str(self.ID), command=command)
 
     #funcs
-    def assign_job(self, job, *rest):
-        print(rest)
+    def assign_job(self, *job):
+        print("assign job")
         print(job)
-        (delivery_paths, packages) = (job,rest)
+
+        (delivery_paths, package) = job
         self.swarm.drone_jobs.update({self.ID:"BUSY"})
         time.sleep(5*self.swarm.droneIDs.index(self.ID))
+
         if(self.z < 0.2):
             self.takeoff()
 
-        if(self.x != delivery_paths[0][0][0] and self.y != delivery_paths[0][0][1]):
-            self.goto(delivery_paths[0][0])
-
+        if(self.x != delivery_paths[0][0] and self.y != delivery_paths[0][1]):
+            self.goto(delivery_paths[0])
         self.lower()
 
-        for package in packages:
-            while True:
-                if(self.load_Package(package)):
-                    print("loaded Package: "+str(package.id))
-                    break
-                time.sleep(self.sleep_update)
+        while True:
+            if(self.load_Package(package)):
+                print("loaded Package: "+str(package.id))
+                break
+            time.sleep(self.sleep_update)
 
-        for path in delivery_paths:
-            print("Do path:"+str(path))
-            for node in path:
-                print("go to node: "+str(ps.get_point_or_idx(node)))
-                self.goto((float(node[0]), float(node[1])))
+        for node in delivery_paths:
+            print("go to node: "+str(ps.get_point_or_idx(node)))
+            self.goto((float(node[0]), float(node[1])))
 
         self.do_delivery(self.packages.pop())
 
-        for path in reversed(delivery_paths):
-            for node in reversed(path):
-                self.goto((float(node[0]), float(node[1])))
+
+        for node in reversed(delivery_paths):
+            self.goto((float(node[0]), float(node[1])))
 
         self.swarm.drone_jobs.update({self.ID:"FREE"})
 
@@ -359,8 +370,27 @@ class Drone(Api):
         print("Drone: "+str(self.ID)+"\t Landing")
         return register
 
+    def _other_drone(self, droneID):
+        command =str(self.swarm_adress)+"/"+str(droneID)+"/status"
+        status = self._command(command=command)
+        return status
+
+    def _check_others(self, pos:(float, float)):
+        droneIDs=self.swarm.droneIDs
+        found_clash = False
+        while found_clash:
+            found_clash = False
+            for id in droneIDs:
+                od_status = self._other_drone(id)
+                if(self.ID > od_status["id"] and pos[0] == od_status["x"] and pos[1] == od_status["y"]):
+                    time.sleep(5)
+                    found_clash = True
+                else:
+                    continue
+
     def goto(self, pos:(float,float)=(1,1), vel:float=0.5, yaw:float = 0.0)->float:
         self._wait_for_task()
+        self._check_others(pos)
 
         #check bugs
         if(self.z == 0):

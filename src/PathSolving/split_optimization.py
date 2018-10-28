@@ -7,10 +7,11 @@ def assign_package(graph, packages_divided, nodes_groups, new_packages):
             if (graph.index(new_package.coordinates)+1) in nodes_groups[i]:
                 packages_divided[i].append(new_package)
                 break
+    print("LA",packages_divided)
     return packages_divided
 
 
-def assign_package_wrapper(new_packages, packages_divided=list(), graph):
+def assign_package_wrapper(new_packages, graph, packages_divided=list()):
     if packages_divided == list():
         packages_divided.append(list())
         packages_divided.append(list())
@@ -19,9 +20,12 @@ def assign_package_wrapper(new_packages, packages_divided=list(), graph):
     nodes_groups.append([3, 2, 8])
     nodes_groups.append([5, 7])
     nodes_groups.append([6, 4, 9])
-    return assign_package(graph, packages_divided, nodes_groups, new_packages)
+    super_list = assign_package(graph, packages_divided, nodes_groups, new_packages)
+    return super_list
 
+import src.PathSolving.path_solver as ps
 def optimal_path(G, targets):
+   targets = [ps.get_point_or_idx(package.coordinates[:2]) for package in targets]
    total_cost = list()
    shortest_path = list()
    min_cost = 0
@@ -50,6 +54,8 @@ def optimal_path(G, targets):
        return shortest_path
 
    elif len(targets) == 3:
+       print("Targest: ",targets)
+       print("Paths: ",nx.dijkstra_path_length(G, 1, targets[0]))
        total_cost.append(nx.dijkstra_path_length(G, 1, targets[0]) + nx.dijkstra_path_length(G, targets[0], targets[1]) + nx.dijkstra_path_length(G, targets[1], targets[2]))
        min_cost = total_cost[0]
        min_path = 0
@@ -87,7 +93,7 @@ def optimal_path(G, targets):
            del sublist1[0]
            del sublist2[0]
            shortest_path = [nx.dijkstra_path(G, 1, targets[0]) + sublist1 + sublist2]
-if min_path == 2:
+       if min_path == 2:
            sublist1 = nx.dijkstra_path(G, targets[1], targets[0])
            sublist2 = nx.dijkstra_path(G, targets[0], targets[2])
            del sublist1[0]
@@ -113,19 +119,20 @@ if min_path == 2:
            shortest_path = [nx.dijkstra_path(G, 1, targets[2]) + sublist1 + sublist2]
        return shortest_path
 
-
+import os
 def get_my_work(my_index, packages_divided):
-    G = nx.read_gpickle('our_map.mp')
+    G = nx.read_gpickle(os.getcwd()+'/coordinates/our_map.mp')
     if len(packages_divided[my_index]) < 3:
         my_work=packages_divided[my_index]
         packages_divided[my_index] = list()
     else:
         my_work=packages_divided[my_index][0:3]
         for i in range(0, 3):
-            del packages_divided[my_index][i]
+            packages_divided[my_index].pop()
+
     #optimal_path = list()
-    optimal_path = optimal_path(G, my_work)
-    return my_work, optimal_path
+    optimal_pathT = optimal_path(G, my_work)
+    return my_work, optimal_pathT
 
 '''
 from src.PathSolving import path_solver as ps

@@ -4,8 +4,7 @@ from src.PathSolving import split_optimization as so
 
 execute_it=True
 
-swarm = api.Swarm(swarm_id="Swarmer", server_id="http://10.4.14.248:5000/api", swarm_drones=[36])
-#248, 28, 37
+swarm = api.Swarm(swarm_id="Swarmer", server_id="http://10.4.14.248:5000/api", swarm_drones=[ 34,35])
 
 #arena = swarm.get_arena()
 #print("ARENA:\n",arena)
@@ -19,6 +18,9 @@ swarm = api.Swarm(swarm_id="Swarmer", server_id="http://10.4.14.248:5000/api", s
 #generate packages
 source_node=[2.2, 1.6]
 packages = [swarm.get_package() for x in range(10)]
+for pack in packages:
+    setattr(pack, "coordinates", pack.coordinates[:2])
+
 print([x.weight for x in packages])
 
 #generate_paths:
@@ -31,30 +33,45 @@ graph= [[2.2, 1.6], #[2.3,1.6],
             [1.0, 1.6], #[0.8,1.6],
             [3.6, 0.6], #[3.7,0.5],
             [3.2, 3.2]] #[3.3,3.1],
-"""
-packages_divided = so.assign_package_wrapper(packages,graph=graph)
-my_work, optimal_path = so.get_my_work(len(drone_ids), packages_divided)
-"""
 
-edges = [(graph[x-1],graph[x]) for x in range(1, len(graph))]
+packages_divided = so.assign_package_wrapper(packages,graph=graph)
+print("Divided",str(packages_divided))
+jobs = []
+for ind,drone in enumerate(swarm.droneIDs):
+    package_chunk, path_chunk = so.get_my_work(ind, packages_divided)
+    jobs.append((path_chunk, package_chunk))
+
+print(jobs)
+
+
+edges = [(ps.get_point_or_idx(graph[x-1]),ps.get_point_or_idx(graph[x])) for x in range(1, len(graph))]
+
 paths = ps.do([(source_node, package.coordinates[:2]) for package in packages])
+jobs = list(zip(paths,packages))
+
+#paths = ps.do(edges)
+
+
 
 print(paths)
 print(packages)
+print(jobs)
+
 
 for pack in packages:
     print("Deliver package to : "+str(ps.get_point_or_idx(pack.coordinates[:2])))
 
 if execute_it:
     try:
+        import time
         swarm.init_drones()
-        swarm.schedule_jobs(delivery_path=[paths], packages=[packages[0]])
-
-        #while True:
-        #    if(swarm.check_jobs_done):
-        #        swarm.shutdown()
-
-        swarm.shutdown()
+        swarm.schedule_jobs(jobs)
+        swarm.schedule_jobs(jobs)
+        swarm.run_processes()
+        while True:
+            if(swarm.wait_for_jobs):
+                swarm.shutdown()
+                break
 
         """
         droneOne.connect()
