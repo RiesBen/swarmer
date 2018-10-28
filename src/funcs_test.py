@@ -1,5 +1,6 @@
 from src import api_wrapper as api
 from src.PathSolving import path_solver as ps
+import multiprocessing as mlp
 import time
 
 execute_it=True
@@ -18,7 +19,7 @@ buildingOne = arena["buildings"][0]
 drone_ids = swarm.droneIDs
 #print(drone_ids)
 
-droneOne = api.Drone(droneID=drone_ids[1], swarm=swarm)
+droneOne = api.Drone(droneID=drone_ids[0], swarm=swarm)
 
 #Do
 try:
@@ -28,7 +29,7 @@ except Exception as err:
 
 #generate packages
 source_node=[2.2, 1.6]
-packages = [swarm.get_package() for x in range(2)]
+packages = [swarm.get_package() for x in range(10)]
 print([x.weight for x in packages])
 
 #generate_paths:
@@ -43,11 +44,13 @@ graph= [[2.2, 1.6], #[2.3,1.6],
             [3.2, 3.2]] #[3.3,3.1],
 edges = [(graph[x-1],graph[x]) for x in range(1, len(graph))]
 paths = ps.do([(source_node, package.coordinates[:2]) for package in packages])
-paths = ps.do(edges)
+#paths = ps.do(edges)
 print(paths)
 print(packages)
 
-exit()
+for pack in packages:
+    print("Deliver package to : "+str(ps.get_point_or_idx(pack.coordinates[:2])))
+
 if execute_it:
     try:
         """
@@ -71,16 +74,26 @@ if execute_it:
             for node in path:
                 print(node)
                 droneOne.goto((float(node[0]), float(node[1])))
-
         droneOne.land()
         droneOne.disconnect()
+
         """
+        """
+        swarm.init_drone()
+        swarm.schedule_jobs(delivery_path=paths, packages=[packages[0]])
+        if(swarm.check_jobs_done):
+            swarm.shutdown()
+        """
+
+
         droneOne.connect()
         droneOne.calibrate()
-        droneOne.assign_job(delivery_paths=paths , packages=[packages[0]])
-        droneOne.land()
+        droneOne.assign_job(delivery_paths=[paths[0]], packages=[packages[0]])
+        droneOne.assign_job(delivery_paths=[paths[1]], packages=[packages[1]])
+        droneOne.land(vel=0.2)
         droneOne.disconnect()
         print(swarm.print_deliveries())
+
 
     except Exception as err:
         droneOne.land()

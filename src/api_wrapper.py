@@ -1,7 +1,7 @@
 import json
 import requests
 import time
-
+import src.PathSolving.path_solver as ps
 
 class Package:
     coordinates: (float, float, float)=None
@@ -92,19 +92,26 @@ class Swarm(Api):
         self.droneIDs = swarm_drones
         self.drone_jobs = {x:"FREE" for x in self.droneIDs}
 
+    def init_drones(self):
+        print("connect drones")
         for ind,x in enumerate(self.droneIDs):
+            print(x)
             tmp_drone = Drone(droneID=x, swarm=self)
             self.drones.append(tmp_drone)
             tmp_drone.connect()
 
-    def shutdwon(self):
+    def shutdown(self):
         for drone in self.drones:
             drone.disconnect()
-    def schedule_jobs(self):
+
+    def schedule_jobs(self,delivery_path: list, packages:list):
         for droneID in self.droneIDs:
             if(self.drone_jobs[droneID] == "FREE"):
-                self.drones[droneID]
+                self.drones[droneID].assign_job()
 
+    def check_jobs_done(self):
+
+        pass
     def _swarm_command(self, command:str)->dict  or bool:
         return self._command(adress=self.swarm_adress, command=command)
 
@@ -155,8 +162,12 @@ class Drone(Api):
         self.capacity = capacity
 
     def load_Package(self, package:Package):
-        self.packages.append(package)
-        self.load += package.weight
+            self._wait_for_task()
+            ret=self.pickup(package.id)
+            if(ret):
+                self.packages.append(package)
+                self.load += package.weight
+            return ret
 
     def _reached_target(self):
         targets = {x:getattr(self.action, x)  for x in vars(self.action) if "target" in x and not "yaw" in x}
@@ -219,14 +230,21 @@ class Drone(Api):
     #funcs
     def assign_job(self, delivery_paths:list, packages:list):
         self.swarm.drone_jobs.update({self.ID:"BUSY"})
-        for package in packages:
-            self.load_Package(package)
 
         self.takeoff()
+        self.goto(delivery_paths[0][0])
+        self.lower()
+
+        for package in packages:
+            while True:
+                if(self.load_Package(package)):
+                    print("loaded Package: "+str(package.id))
+                    break
+
         for path in delivery_paths:
             print("Do path:"+str(path))
             for node in path:
-                print(node)
+                print("go to node: "+str(ps.get_point_or_idx(node)))
                 self.goto((float(node[0]), float(node[1])))
 
         self.do_delivery(self.packages.pop())
@@ -234,15 +252,18 @@ class Drone(Api):
         for path in reversed(delivery_paths):
             for node in reversed(path):
                 self.goto((float(node[0]), float(node[1])))
+
         self.swarm.drone_jobs.update({self.ID:"FREE"})
 
 
     def do_delivery(self, package:Package):
         self.lower()
-        self.deliver(package)
+        while True:
+            if(self.deliver(package)):
+                print("Delivered package to: "+str(ps.get_point_or_idx(package.coordinates[:2])))
+                break
 
     def lower(self):
-        print("Goto waiting")
         self._wait_for_task()
 
         # check bugs
@@ -250,7 +271,7 @@ class Drone(Api):
             raise Exception("I'm not in the air!")
 
         command = "goto?x=" + str(float(self.x)) + "&y=" + str(float(self.y)) + "&z=" + str(
-            float(0.1)) + "&yaw=" + str(self.yaw) + "&v=" + str(0.4)
+            float(0.07)) + "&yaw=" + str(self.yaw) + "&v=" + str(0.3)
         action_dict = self._drone_command(command)
         print("Drone " + str(self.ID) + " Lowering")
         action = Action(action_dict)
@@ -285,7 +306,6 @@ class Drone(Api):
         return register
 
     def goto(self, pos:(float,float)=(1,1), vel:float=0.5, yaw:float = 0.0)->float:
-        print("Goto waiting")
         self._wait_for_task()
 
         #check bugs
@@ -294,7 +314,7 @@ class Drone(Api):
 
         command="goto?x="+str(float(pos[0]))+"&y="+str(float(pos[1]))+"&z="+str(float(self.flight_heigth))+"&yaw="+str(yaw)+"&v="+str(vel)
         action_dict = self._drone_command(command)
-        print("Drone "+str(self.ID)+" is navigating to: "+str(pos))
+        print("Drone "+str(self.ID)+" is navigating to: "+str(ps.get_point_or_idx(pos)))
         action = Action(action_dict)
         setattr(self, "action", action)
         return action
@@ -320,4 +340,10 @@ class Drone(Api):
     def calibrate(self)->bool:
         command="calibrate"
         register = self._drone_command(command)
+        return register["success"]
+
+    def pickup(self, packageID:str):
+        command="pickup?package_id="+packageID
+        register = self._drone_command(command=command)
+        setattr(self, "action", None)
         return register["success"]
