@@ -4,7 +4,7 @@ from src.PathSolving import split_optimization as so
 
 execute_it=True
 
-swarm = api.Swarm(swarm_id="Swarmer", server_id="http://10.4.14.248:5000/api", swarm_drones=[ 34,35])
+swarm = api.Swarm(swarm_id="Swarmer", server_id="http://10.4.14.248:5000/api", swarm_drones=[ 34,35, 36])
 
 #arena = swarm.get_arena()
 #print("ARENA:\n",arena)
@@ -65,8 +65,8 @@ if execute_it:
     try:
         import time
         swarm.init_drones()
-        swarm.schedule_jobs(jobs)
-        swarm.schedule_jobs(jobs)
+        for job in jobs[:3]:
+            swarm.schedule_jobs(job)
         swarm.run_processes()
         while True:
             if(swarm.wait_for_jobs):

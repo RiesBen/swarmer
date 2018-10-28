@@ -3,8 +3,9 @@ import requests
 import time
 import multiprocessing as mp
 import src.PathSolving.path_solver as ps
-import threading
+import logging
 
+logging.getLogger("requests").setLevel(logging.WARNING)
 
 class Package:
     coordinates: (float, float, float)=None
@@ -54,7 +55,7 @@ class Api:
     def _command(self, adress: str, command: str) -> dict or bool:
             try:
                 print(self.server_id + "/" + command)
-                r = requests.get(url=adress + "/" + command)
+                r = requests.get(url=adress + "/" + command, )
                 print(r.text)
             except Exception as err:
                 raise Exception(
@@ -120,9 +121,8 @@ class Swarm(Api):
                 drone.disconnect()
             except:
                 continue
-                
-    def schedule_jobs(self,jobs):
-        job = jobs.pop()
+
+    def schedule_jobs(self,job):
         print("new JOB")
         print(job)
         print(self.drone_jobs)
@@ -137,13 +137,14 @@ class Swarm(Api):
 
         if not(assigned):
             time.sleep(7) #parameter!
-            return self.schedule_jobs(jobs)
+            return self.schedule_jobs(job)
 
     def run_processes(self):
         print(self.processes)
         for p in self.processes:
             print("START")
             p.start()
+            time.sleep(1)
 
         self.wait_for_jobs()
 
@@ -378,7 +379,9 @@ class Drone(Api):
     def _check_others(self, pos:(float, float)):
         droneIDs=self.swarm.droneIDs
         found_clash = False
-        while found_clash:
+        max_iter=3
+        i=0
+        while found_clash or (i >= max_iter):
             found_clash = False
             for id in droneIDs:
                 od_status = self._other_drone(id)
@@ -387,6 +390,7 @@ class Drone(Api):
                     found_clash = True
                 else:
                     continue
+            i += 1
 
     def goto(self, pos:(float,float)=(1,1), vel:float=0.5, yaw:float = 0.0)->float:
         self._wait_for_task()
