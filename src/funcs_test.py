@@ -1,10 +1,10 @@
 from src import api_wrapper as api
 from src.PathSolving import path_solver as ps
-
+from src.PathSolving import split_optimization as so
 
 execute_it=True
 
-swarm = api.Swarm(swarm_id="Swarmer", server_id="http://10.4.14.248:5000/api", swarm_drones=[34])
+swarm = api.Swarm(swarm_id="Swarmer", server_id="http://10.4.14.248:5000/api", swarm_drones=[36])
 #248, 28, 37
 
 #arena = swarm.get_arena()
@@ -15,14 +15,7 @@ swarm = api.Swarm(swarm_id="Swarmer", server_id="http://10.4.14.248:5000/api", s
 #buildingOne = arena["buildings"][0]
 #print("BUILDING: ",buildingOne)
 
-drone_ids = swarm.droneIDs
-#print(drone_ids)
-
-#droneOne = api.Drone(droneID=drone_ids[0], swarm=swarm)
-
 #Do
-
-
 #generate packages
 source_node=[2.2, 1.6]
 packages = [swarm.get_package() for x in range(10)]
@@ -38,9 +31,14 @@ graph= [[2.2, 1.6], #[2.3,1.6],
             [1.0, 1.6], #[0.8,1.6],
             [3.6, 0.6], #[3.7,0.5],
             [3.2, 3.2]] #[3.3,3.1],
+"""
+packages_divided = so.assign_package_wrapper(packages,graph=graph)
+my_work, optimal_path = so.get_my_work(len(drone_ids), packages_divided)
+"""
+
 edges = [(graph[x-1],graph[x]) for x in range(1, len(graph))]
 paths = ps.do([(source_node, package.coordinates[:2]) for package in packages])
-#paths = ps.do(edges)
+
 print(paths)
 print(packages)
 
@@ -49,38 +47,14 @@ for pack in packages:
 
 if execute_it:
     try:
-        """
-            droneOne.connect()
-            droneOne.calibrate()
-            droneOne.load_Package(packages[0])
-            droneOne.takeoff(height=0.3, vel=1)
-            print("GOTO!")
-            droneOne.goto(pos=(1.0, 1.6), vel=0.6)
-            droneOne.do_delivery(droneOne.packages[0])
-            droneOne.goto(pos=(2.2,1.6), vel=0.6)
-            print("LAAAND")
-            droneOne.land(height=0, vel=0.3)
-            droneOne.disconnect()
-        """
-
-        """
-        droneOne.takeoff()
-        for path in paths:
-            print("Do path:"+str(path))
-            for node in path:
-                print(node)
-                droneOne.goto((float(node[0]), float(node[1])))
-        droneOne.land()
-        droneOne.disconnect()
-
-        """
-
         swarm.init_drones()
-        swarm.schedule_jobs(delivery_path=paths, packages=[packages[0]])
+        swarm.schedule_jobs(delivery_path=[paths], packages=[packages[0]])
+
         #while True:
         #    if(swarm.check_jobs_done):
         #        swarm.shutdown()
 
+        swarm.shutdown()
 
         """
         droneOne.connect()
@@ -90,7 +64,6 @@ if execute_it:
         droneOne.land(vel=0.2)
         droneOne.disconnect()
         """
-        swarm.shutdown()
         print(swarm.print_deliveries())
 
     except Exception as err:

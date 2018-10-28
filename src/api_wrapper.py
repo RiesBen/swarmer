@@ -3,6 +3,8 @@ import requests
 import time
 import multiprocessing as mp
 import src.PathSolving.path_solver as ps
+import threading
+
 
 class Package:
     coordinates: (float, float, float)=None
@@ -94,7 +96,7 @@ class Swarm(Api):
         self.swarm_adress = server_id+"/"+self.id
         self.droneIDs = swarm_drones
         self.drone_jobs = {x:"FREE" for x in self.droneIDs}
-        self.swarm_thread_pool = mp.Pool(processes=len(self.droneIDs))
+        #self.swarm_thread_pool = mp.Pool(processes=len(self.droneIDs))
 
         try:
             self.register(arena=arena)
@@ -117,24 +119,34 @@ class Swarm(Api):
             drone.disconnect()
 
     def schedule_jobs(self,delivery_path: list, packages:list):
-        #self.active_jobs.append(
         assigned = False
+        tuple_list = []
         for ind,droneID in enumerate(self.droneIDs):
             if(self.drone_jobs[droneID] == "FREE"):
-                #setattr(self, "Callback", None)
-                #print((delivery_path, packages))
-                #print(self.drone_jobs)
-                #self.swarm_thread_pool.apply_async(self.drones[ind].assign_job, (delivery_path, packages), callback=self.Callback)
-                #print(self.drone_jobs)
-                #print(self.Callback)
-                #self.swarm_thread_pool.map(self.drones[ind].assign_job, (delivery_path, packages))
-                self.drones[ind].assign_job((delivery_path, packages))
+                #p =self.swarm_thread_pool.Process(target=self.drones[ind].assign_job, args=(delivery_path.pop(), packages.pop()))
+                #self.swarm_thread_pool.
+                t=
                 assigned=True
 
         if not(assigned):
             time.sleep(7) #parameter!
             return self.schedule_jobs(delivery_path, packages)
-        return True
+        else:
+            p.start()
+            time.sleep(5)
+
+            pass
+          #  mp.Process(self.dr)
+              #  mp.Pool(processes=len(self.droneIDs)).starmap(self.swarm_assign_job, tuple_list)
+            return True
+
+    def swarm_assign_job(self, drone_ID, job):
+        self.drones[self.droneIDs.index(drone_ID)].assign_job(job)
+
+    def __getstate__(self):
+        self_dict = self.__dict__.copy()
+        del self_dict['swarm_thread_pool']
+        return self_dict
 
     def check_jobs_done(self):
         for droneID in self.droneIDs:
@@ -261,8 +273,10 @@ class Drone(Api):
         return self._command(adress=self.swarm_adress+"/"+str(self.ID), command=command)
 
     #funcs
-    def assign_job(self, job:tuple):
-        (delivery_paths, packages) = job
+    def assign_job(self, job, *rest):
+        print(rest)
+        print(job)
+        (delivery_paths, packages) = (job,rest)
         self.swarm.drone_jobs.update({self.ID:"BUSY"})
         time.sleep(5*self.swarm.droneIDs.index(self.ID))
         if(self.z < 0.2):
