@@ -1,6 +1,7 @@
 import json
 import requests
 import time
+import multiprocessing as mp
 import src.PathSolving.path_solver as ps
 
 class Package:
@@ -23,7 +24,7 @@ class Action:
     waited_dur: bool = False
 
     def __init__(self, action: dict):
-        att_list = ["duration", "relative", "target_x", "target_y", "target_z", "target_yaw"]
+        att_list = ["duration", "relative", "target_x", "target_y", "target_z", "target_yaw", "battery_percentage"]
         for x in action:
             if(x in att_list):
                 setattr(self, x, action[x])
@@ -84,34 +85,66 @@ class Swarm(Api):
     packages: list = []
     drone_jobs:dict = {}
     drones:list =[]
+    swarm_thread_pool:mp.Pool = None
+    active_jobs = {}
 
-    def __init__(self, swarm_id:str, server_id:str = "http://10.4.14.248:5000/api", swarm_drones=[34,35,36]):
+    def __init__(self, swarm_id:str, server_id:str = "http://10.4.14.248:5000/api", swarm_drones=[34,35,36], arena:int=2):
         super().__init__(server_id=server_id)
         self.id = swarm_id
         self.swarm_adress = server_id+"/"+self.id
         self.droneIDs = swarm_drones
         self.drone_jobs = {x:"FREE" for x in self.droneIDs}
+        self.swarm_thread_pool = mp.Pool(processes=len(self.droneIDs))
+
+        try:
+            self.register(arena=arena)
+        except Exception as err:
+            print("Was already Registered")
+
 
     def init_drones(self):
         print("connect drones")
         for ind,x in enumerate(self.droneIDs):
-            print(x)
+            print("Drone: "+str(x))
             tmp_drone = Drone(droneID=x, swarm=self)
             self.drones.append(tmp_drone)
             tmp_drone.connect()
 
     def shutdown(self):
         for drone in self.drones:
+            drone.land()
+            time.sleep(1)
             drone.disconnect()
 
     def schedule_jobs(self,delivery_path: list, packages:list):
-        for droneID in self.droneIDs:
+        #self.active_jobs.append(
+        assigned = False
+        for ind,droneID in enumerate(self.droneIDs):
             if(self.drone_jobs[droneID] == "FREE"):
-                self.drones[droneID].assign_job()
+                #setattr(self, "Callback", None)
+                #print((delivery_path, packages))
+                #print(self.drone_jobs)
+                #self.swarm_thread_pool.apply_async(self.drones[ind].assign_job, (delivery_path, packages), callback=self.Callback)
+                #print(self.drone_jobs)
+                #print(self.Callback)
+                #self.swarm_thread_pool.map(self.drones[ind].assign_job, (delivery_path, packages))
+                self.drones[ind].assign_job((delivery_path, packages))
+                assigned=True
+
+        if not(assigned):
+            time.sleep(7) #parameter!
+            return self.schedule_jobs(delivery_path, packages)
+        return True
 
     def check_jobs_done(self):
+        for droneID in self.droneIDs:
+            if(self.drone_jobs[droneID] == "FREE"):
+                pass
+            else:
+               return False
 
-        pass
+        return True
+
     def _swarm_command(self, command:str)->dict  or bool:
         return self._command(adress=self.swarm_adress, command=command)
 
@@ -147,7 +180,7 @@ class Drone(Api):
     capacity:float = None
     action:Action = None
     status:str = None
-    sleep_update: float = 1
+    sleep_update: float = 0.5
     accepting_ration:float = 0.75
     accepted_variance = 0.2
     packages:Package = []
@@ -228,11 +261,16 @@ class Drone(Api):
         return self._command(adress=self.swarm_adress+"/"+str(self.ID), command=command)
 
     #funcs
-    def assign_job(self, delivery_paths:list, packages:list):
+    def assign_job(self, job:tuple):
+        (delivery_paths, packages) = job
         self.swarm.drone_jobs.update({self.ID:"BUSY"})
+        time.sleep(5*self.swarm.droneIDs.index(self.ID))
+        if(self.z < 0.2):
+            self.takeoff()
 
-        self.takeoff()
-        self.goto(delivery_paths[0][0])
+        if(self.x != delivery_paths[0][0][0] and self.y != delivery_paths[0][0][1]):
+            self.goto(delivery_paths[0][0])
+
         self.lower()
 
         for package in packages:
@@ -240,6 +278,7 @@ class Drone(Api):
                 if(self.load_Package(package)):
                     print("loaded Package: "+str(package.id))
                     break
+                time.sleep(self.sleep_update)
 
         for path in delivery_paths:
             print("Do path:"+str(path))
@@ -262,6 +301,7 @@ class Drone(Api):
             if(self.deliver(package)):
                 print("Delivered package to: "+str(ps.get_point_or_idx(package.coordinates[:2])))
                 break
+            time.sleep(self.sleep_update)
 
     def lower(self):
         self._wait_for_task()
@@ -271,7 +311,7 @@ class Drone(Api):
             raise Exception("I'm not in the air!")
 
         command = "goto?x=" + str(float(self.x)) + "&y=" + str(float(self.y)) + "&z=" + str(
-            float(0.07)) + "&yaw=" + str(self.yaw) + "&v=" + str(0.3)
+            float(0.1)) + "&yaw=" + str(0.0) + "&v=" + str(0.3)
         action_dict = self._drone_command(command)
         print("Drone " + str(self.ID) + " Lowering")
         action = Action(action_dict)

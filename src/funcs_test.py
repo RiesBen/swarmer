@@ -1,31 +1,27 @@
 from src import api_wrapper as api
 from src.PathSolving import path_solver as ps
-import multiprocessing as mlp
-import time
+
 
 execute_it=True
 
-swarm = api.Swarm(swarm_id="Swarmer", server_id="http://10.4.14.248:5000/api")
+swarm = api.Swarm(swarm_id="Swarmer", server_id="http://10.4.14.248:5000/api", swarm_drones=[34])
 #248, 28, 37
 
-arena = swarm.get_arena()
+#arena = swarm.get_arena()
 #print("ARENA:\n",arena)
 
 #print(swarm.buildings )
-buildingOne = swarm.buildings[0]
-buildingOne = arena["buildings"][0]
+#buildingOne = swarm.buildings[0]
+#buildingOne = arena["buildings"][0]
 #print("BUILDING: ",buildingOne)
 
 drone_ids = swarm.droneIDs
 #print(drone_ids)
 
-droneOne = api.Drone(droneID=drone_ids[0], swarm=swarm)
+#droneOne = api.Drone(droneID=drone_ids[0], swarm=swarm)
 
 #Do
-try:
-    registered= swarm.register(arena=2)
-except Exception as err:
-    print("Was already Registered")
+
 
 #generate packages
 source_node=[2.2, 1.6]
@@ -78,24 +74,27 @@ if execute_it:
         droneOne.disconnect()
 
         """
-        """
-        swarm.init_drone()
+
+        swarm.init_drones()
         swarm.schedule_jobs(delivery_path=paths, packages=[packages[0]])
-        if(swarm.check_jobs_done):
-            swarm.shutdown()
+        #while True:
+        #    if(swarm.check_jobs_done):
+        #        swarm.shutdown()
+
+
         """
-
-
         droneOne.connect()
         droneOne.calibrate()
-        droneOne.assign_job(delivery_paths=[paths[0]], packages=[packages[0]])
-        droneOne.assign_job(delivery_paths=[paths[1]], packages=[packages[1]])
+        for ind, path in enumerate(paths):
+            droneOne.assign_job(job=([path], [packages[ind]]))
         droneOne.land(vel=0.2)
         droneOne.disconnect()
+        """
+        swarm.shutdown()
         print(swarm.print_deliveries())
 
-
     except Exception as err:
-        droneOne.land()
-        droneOne.disconnect()
+        #droneOne.land()
+        #droneOne.disconnect()
+        swarm.shutdown()
         print("error: "+str(err.with_traceback(err)))
