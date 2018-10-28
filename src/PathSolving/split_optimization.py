@@ -30,21 +30,6 @@ def assign_package_wrapper(new_packages, packages_divided=list()):
     nodes_groups.append([6, 4, 9])
     return assign_package(graph, packages_divided, nodes_groups, new_packages)
 
-
-def get_my_work(my_index, packages_divided):
-    G = nx.read_gpickle('our_map.mp')
-    if len(packages_divided[my_index]) < 3:
-        my_work=packages_divided[my_index]
-        packages_divided[my_index] = list()
-    else:
-        my_work=packages_divided[my_index][0:3]
-        for i in range(0, 3):
-            del packages_divided[my_index][i]
-    #optimal_path = list()
-    optimal_path = optimal_path(G, my_work)
-    return my_work, optimal_path
-
-
 def optimal_path(G, targets):
    total_cost = list()
    shortest_path = list()
@@ -138,6 +123,18 @@ if min_path == 2:
        return shortest_path
 
 
+def get_my_work(my_index, packages_divided):
+    G = nx.read_gpickle('our_map.mp')
+    if len(packages_divided[my_index]) < 3:
+        my_work=packages_divided[my_index]
+        packages_divided[my_index] = list()
+    else:
+        my_work=packages_divided[my_index][0:3]
+        for i in range(0, 3):
+            del packages_divided[my_index][i]
+    #optimal_path = list()
+    optimal_path = optimal_path(G, my_work)
+    return my_work, optimal_path
 
 '''
 from src.PathSolving import path_solver as ps
